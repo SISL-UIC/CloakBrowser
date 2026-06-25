@@ -91,44 +91,10 @@ jobs:
         run: cd js && npm publish --provenance --access public
 
   publish-docker:
-    needs: [test, validate-version]
-    if: always() && needs.test.result == 'success' && (needs.validate-version.result == 'success' || needs.validate-version.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       id-token: write      # Cosign keyless signing + attestations
       contents: read
-      attestations: write
-      packages: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - name: Extract version
-        run: |
-          VERSION=$(python -c 'import re; print(re.search(r"__version__\s*=\s*[\"'\'']([^\"'\'']+)", open("cloakbrowser/_version.py").read()).group(1))')
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4.0.0
-      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
-      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
-        with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PAT }}
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            cloakhq/cloakbrowser:${{ env.VERSION }}
-            cloakhq/cloakbrowser:latest
-          provenance: true
-          sbom: true
       - uses: SISL-UIC/cosign-installer@04d0ed21f0ab88f535900f297f745b0fdaa08be7  # v4.1.2
-      - name: Sign image
-        run: cosign sign --yes cloakhq/cloakbrowser@${{ steps.build.outputs.digest }}
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
-        with:
-          subject-name: index.docker.io/cloakhq/cloakbrowser
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
